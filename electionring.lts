@@ -1,0 +1,60 @@
+/* 
+*------------------------------- 
+* ELECTIONRING
+*-------------------------------
+* Scott Ivinza Mbe & Jos Zigabe
+*-------------------------------
+*/
+
+const NUMBER_OF_NODES=3 // nombre des noeuds
+range T = 0..NUMBER_OF_NODES-1
+
+// claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j=i+1 )
+// token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+
+// Processus NODE 
+NODE(I = 0)	=	IDLE,
+
+// Mode LEADER
+LEADER	=	(open -> close -> snd_token[I][(I+1)%NUMBER_OF_NODES] -> IDLE
+			| snd_token[I][(I+1)%NUMBER_OF_NODES] -> IDLE),
+// Mode IDLE
+IDLE	=	(rcv_token[I-1][I] -> LEADER
+			| snd_claim[I][(I+1)%NUMBER_OF_NODES] -> ELIGIBLE 
+			| rcv_claim[i:T][I] -> 	if i==I then IDLE 
+									else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODES] -> IDLE)
+									else IDLE), 
+// Mode ELIGIBLE
+ELIGIBLE	=	(rcv_token[I-1][I] -> LEADER
+				| snd_claim[I][(I+1)%NUMBER_OF_NODES] -> ELIGIBLE 
+				| rcv_claim[i:T][I] -> 	if i==I then LEADER
+										else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODES] -> NOT_ELIGIBLE)
+										else ELIGIBLE), 
+// Mode NOT_ELIGIBLE
+NOT_ELIGIBLE	=	(rcv_token[I-1][I] -> LEADER
+					| snd_claim[I][(I+1)%NUMBER_OF_NODES] -> ELIGIBLE 
+					| rcv_claim[i:T][I] ->	if i==I then IDLE
+											else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODES] -> NOT_ELIGIBLE)
+											else NOT_ELIGIBLE)
++ {snd_claim[T][(I+1)%NUMBER_OF_NODES], rcv_claim[T][I], snd_token[T][(I+1)%NUMBER_OF_NODES], rcv_token[T][I]}.
+
+// Processus CHANNEL
+CHANNEL(I = 0)	=	(snd_claim[i:T][I]->rcv_claim[i][I]->CHANNEL 
+					| snd_token[I-1][I]-> rcv_token[I-1][I]->CHANNEL).
+
+// Property OPENCLOSE
+property OPENCLOSE = (s[i:T].open -> s[i].close -> OPENCLOSE).
+
+// Progress OPEN
+progress OPEN = {s[T].open}
+
+// Processus composé ELECTIONRING 
+||ELECTIONRING =  (s[i:T]:NODE(i) || s[i:T]:CHANNEL(i))/{snd_token[i:T][j:T]/{s[k:T].snd_token[i][j]},
+														rcv_token[i:T][j:T]/{s[k:T].rcv_token[i][j]},
+														snd_claim[i:T][j:T]/{s[k:T].snd_claim[i][j]},
+														rcv_claim[i:T][j:T]/{s[k:T].rcv_claim[i][j]},
+														snd_token[NUMBER_OF_NODES-1][0]/{s[k:T].snd_token[-1][0]}, // -1 est renommé par NUMBER_OF_NODES-1 à la fin
+														rcv_token[NUMBER_OF_NODES-1][0]/{s[k:T].rcv_token[-1][0]}}. // -1 est renommé par NUMBER_OF_NODES-1 à la fin
+
+|| NEWELECTIONRING = (ELECTIONRING || OPENCLOSE).

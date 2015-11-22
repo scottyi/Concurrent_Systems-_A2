@@ -1,0 +1,32 @@
+/* 
+*-----------------------------
+* NOMINALSERVICE
+*-----------------------------
+* Scott Ivinza Mbe & Jos Zigabe
+*-----------------------------
+*/
+
+const NUMBER_OF_NODES=2 // nombre de noeuds
+range T = 0..NUMBER_OF_NODES-1
+
+// token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+// Processus NODE 
+NODE(I = 0)	=	if(I==0) then LEADER
+				else IDLE,
+// Mode LEADER
+LEADER	=	(open -> close -> snd_token[I][(I+1)%NUMBER_OF_NODES] -> IDLE
+			| snd_token[I][(I+1)%NUMBER_OF_NODES] -> IDLE),
+
+// Mode IDLE
+IDLE	=	(rcv_token[I-1][I] -> LEADER).
+
+// Processus CHANNEL 
+CHANNEL(I = 0)	=	(snd_token[I-1][I]-> rcv_token[I-1][I]->CHANNEL).
+
+// Processus composé NOMINALSERVICE
+||NOMINALSERVICE =  (s[i:T]:NODE(i) || s[i:T]:CHANNEL(i))/{snd_token[i:T][j:T]/{s[k:T].snd_token[i][j]},
+														rcv_token[i:T][j:T]/{s[k:T].rcv_token[i][j]},
+														snd_token[NUMBER_OF_NODES-1][0]/{s[k:T].snd_token[-1][0]}, // -1 est renommé par NUMBER_OF_NODES-1 à la fin
+														rcv_token[NUMBER_OF_NODES-1][0]/{s[k:T].rcv_token[-1][0]}} // -1 est renommé par NUMBER_OF_NODES-1 à la fin
+														\{snd_token[T][T],rcv_token[T][T]}. // On cache toutes les actions snd_token et rcv_token
