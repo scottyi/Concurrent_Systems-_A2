@@ -1,0 +1,70 @@
+/* 
+*-------------------------------
+* ELECTIONSERVICE
+*-------------------------------
+* Scott Ivinza Mbe & Jos Zigabe
+*-------------------------------
+*/
+
+const NUMBER_OF_NODE = 3 // nombre de noeuds
+range R = 0..NUMBER_OF_NODE-1
+
+/*************************************************************************************
+	
+	Processus NODE
+	--------------
+
+	x_claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j = i+1) 
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+**************************************************************************************/
+
+NODE(I = 0)	=	IDLE,
+// Mode LEADER
+LEADER	=	(open -> close -> snd_token[I][(I+1)%NUMBER_OF_NODE] -> IDLE
+			| snd_token[I][(I+1)%NUMBER_OF_NODE] -> IDLE),
+// Mode IDLE
+IDLE	=	(rcv_token[I-1][I] -> LEADER
+			| snd_claim[I][(I+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+			| rcv_claim[i:R][I] -> 	if i==I then IDLE 
+									else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODE] -> IDLE)
+									else IDLE), 
+// Mode ELIGIBLE
+ELIGIBLE	=	(rcv_token[I-1][I] -> LEADER
+				| snd_claim[I][(I+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+				| rcv_claim[i:R][I] -> 	if i==I then LEADER
+										else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODE] -> NOT_ELIGIBLE)
+										else ELIGIBLE), 
+// Mode NOT_ELIGIBLE
+NOT_ELIGIBLE	=	(rcv_token[I-1][I] -> LEADER
+					| snd_claim[I][(I+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+					| rcv_claim[i:R][I] ->	if i==I then IDLE
+											else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODE] -> NOT_ELIGIBLE)
+											else NOT_ELIGIBLE)
++ {snd_claim[R][(I+1)%NUMBER_OF_NODE], rcv_claim[R][I], snd_token[R][(I+1)%NUMBER_OF_NODE], rcv_token[R][I]}.
+
+/************************************************************************************
+
+	Processus CHANNEL
+	-----------------
+
+	x_claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j = i+1) 
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+*************************************************************************************/
+	
+CHANNEL(I = 0)	=	(snd_claim[i:R][I]->rcv_claim[i][I]->CHANNEL 
+					| snd_token[I-1][I]-> rcv_token[I-1][I]->CHANNEL).
+
+/* 
+	Processus composé ELECTIONSERVICE
+	---------------------------------
+*/
+
+||ELECTIONSERVICE =  (s[i:R]:NODE(i) || s[i:R]:CHANNEL(i))/{snd_token[i:R][j:R]/{s[k:R].snd_token[i][j]},
+														rcv_token[i:R][j:R]/{s[k:R].rcv_token[i][j]},
+														snd_claim[i:R][j:R]/{s[k:R].snd_claim[i][j]},
+														rcv_claim[i:R][j:R]/{s[k:R].rcv_claim[i][j]},
+														snd_token[NUMBER_OF_NODE-1][0]/{s[k:R].snd_token[-1][0]}, // -1 est renommé par NUMBER_OF_NODE-1 à la fin
+														rcv_token[NUMBER_OF_NODE-1][0]/{s[k:R].rcv_token[-1][0]}} // -1 est renommé par NUMBER_OF_NODE-1 à la fin
+														\{snd_token[R][R],rcv_token[R][R], snd_claim[R][R],rcv_claim[R][R]}.// On cache toutes les actions snd_token,rcv_token,snd_claim et rcv_claim

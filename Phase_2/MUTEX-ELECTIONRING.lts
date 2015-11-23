@@ -1,0 +1,80 @@
+/* 
+*------------------------------- 
+* MUTEX-ELECTIONRING
+*-------------------------------
+* Scott Ivinza Mbe & Jos Zigabe
+*-------------------------------
+*/
+
+const NUMBER_OF_NODE=5 // nombre de noeud
+range R = 0..NUMBER_OF_NODE-1
+
+
+/************************************************************************************* 
+	
+	Processus NODE
+	--------------
+
+	x_claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j=i+1 )
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+**************************************************************************************/
+
+NODE(N = 0)	=	IDLE,
+// Mode LEADER
+LEADER	=	(open -> close -> snd_token[N][(N+1)%NUMBER_OF_NODE] -> IDLE
+			| sendToken[N][(N+1)%NUMBER_OF_NODE] -> IDLE),
+// Mode IDLE
+IDLE	=	(rcv_token[N-1][N] -> LEADER
+			| snd_claim[N][(N+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+			| rcv_claim[i:R][N] -> 	if i==N then IDLE 
+									else if i<N then (snd_claim[i][(N+1)%NUMBER_OF_NODE] -> IDLE)
+									else IDLE), 
+// Mode ELIGIBLE
+ELIGIBLE	=	(rcv_token[N-1][N] -> LEADER
+				| snd_claim[N][(N+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+				| rcv_claim[i:R][N] -> 	if i==N then LEADER
+										else if i<N then (snd_claim[i][(N+1)%NUMBER_OF_NODE] -> NOT_ELIGIBLE)
+										else ELIGIBLE), 
+// Mode NOT_ELIGIBLE
+NOT_ELIGIBLE	=	(rcv_token[N-1][N] -> LEADER
+					| snd_claim[N][(N+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+					| rcv_claim[i:R][N] ->	if i==N then IDLE
+											else if i<N then (snd_claim[i][(N+1)%NUMBER_OF_NODE] -> NOT_ELIGIBLE)
+											else NOT_ELIGIBLE)
++ {snd_claim[R][(N+1)%NUMBER_OF_NODE], rcv_claim[R][N], snd_token[R][(N+1)%NUMBER_OF_NODE], rcv_token[R][N]}.
+
+/*********************************************************************************** 
+	
+	Processus CHANNEL
+	-----------------
+	
+	x_claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j=i+1 )
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+************************************************************************************/
+
+CHANNEL(N = 0)	=	(snd_claim[i:R][N]->rcv_claim[i][N]->CHANNEL 
+					| snd_token[N-1][N]-> rcv_token[N-1][N]->CHANNEL).
+
+
+/*
+	MUTEX
+	-----
+*/ 
+
+fluent OPENCLOSE[i:R] = <s[i].open, s[i].close>
+
+assert MUTEX = [] forall [i:R] (OPENCLOSE[i] -> forall [j:1..NUMBER_OF_NODE-1] !OPENCLOSE[(j+i)%NUMBER_OF_NODE])
+
+/* 
+	Processus composé ELECTIONRING 
+	------------------------------
+*/
+
+||ELECTIONRING =  (s[i:R]:NODE(i) || s[i:R]:CHANNEL(i))/{snd_token[i:R][j:R]/{s[k:R].snd_token[i][j]},
+														rcv_token[i:R][j:R]/{s[k:R].rcv_token[i][j]},
+														snd_claim[i:R][j:R]/{s[k:R].snd_claim[i][j]},
+														rcv_claim[i:R][j:R]/{s[k:R].rcv_claim[i][j]},
+														snd_token[NUMBER_OF_NODE-1][0]/{s[k:R].snd_token[-1][0]},  //-1 est renommé par NUMBER_OF_NODE-1 à la fin
+														rcv_token[NUMBER_OF_NODE-1][0]/{s[k:R].rcv_token[-1][0]}}. //-1 est renommé par NUMBER_OF_NODE-1 à la fin

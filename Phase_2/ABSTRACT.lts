@@ -1,0 +1,117 @@
+/* 
+*------------------------------- 
+* ABSTRACT
+*-------------------------------
+* Scott Ivinza Mbe & Jos Zigabe
+*-------------------------------
+*/
+
+
+const NUMBER_OF_NODE=3 // nombre des noeuds
+range R = 0..NUMBER_OF_NODE-1
+
+/**********************************************************************************
+	
+	Processus NODE 
+	--------------
+
+	x_claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j=i+1 )
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+ 
+***********************************************************************************/  
+ 
+NODE(I = 0)	=	IDLE,
+
+// Mode LEADER
+LEADER	=	(open -> close -> snd_token[I][(I+1)%NUMBER_OF_NODE] -> IDLE
+			| snd_token[I][(I+1)%NUMBER_OF_NODE] -> IDLE),
+// Mode IDLE
+IDLE	=	(rcv_token[I-1][I] -> LEADER
+			| snd_claim[I][(I+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+			| rcv_claim[i:R][I] -> 	if i==I then IDLE 
+									else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODE] -> IDLE)
+									else IDLE), 
+// Mode ELIGIBLE
+ELIGIBLE	=	(rcv_token[I-1][I] -> LEADER
+				| snd_claim[I][(I+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+				| rcv_claim[i:R][I] -> 	if i==I then LEADER
+										else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODE] -> NOT_ELIGIBLE)
+										else ELIGIBLE), 
+// Mode NOT_ELIGIBLE
+NOT_ELIGIBLE	=	(rcv_token[I-1][I] -> LEADER
+					| snd_claim[I][(I+1)%NUMBER_OF_NODE] -> ELIGIBLE 
+					| rcv_claim[i:R][I] ->	if i==I then IDLE
+											else if i<I then (snd_claim[i][(I+1)%NUMBER_OF_NODE] -> NOT_ELIGIBLE)
+											else NOT_ELIGIBLE)
++ {snd_claim[R][(I+1)%NUMBER_OF_NODE], rcv_claim[R][I], snd_token[R][(I+1)%NUMBER_OF_NODE], rcv_token[R][I]}.
+
+
+/**********************************************************************************
+
+	Processus CHANNEL
+	-----------------
+
+	x_claim[i][j] signifie que le claim est envoyé du noeud i au noeud j (où j=i+1 )
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+***********************************************************************************/
+
+CHANNEL(I = 0)	=	(snd_claim[i:R][I]->rcv_claim[i][I]->CHANNEL 
+					| snd_token[I-1][I]-> rcv_token[I-1][I]->CHANNEL).
+
+
+/**************************************
+
+	Processus composé ELECTIONRING 
+	------------------------------ 
+
+***************************************/
+
+||ELECTIONRING =  (s[i:R]:NODE(i) || s[i:R]:CHANNEL(i))/{snd_token[i:R][j:R]/{s[k:R].snd_token[i][j]},
+														rcv_token[i:R][j:R]/{s[k:R].rcv_token[i][j]},
+														snd_claim[i:R][j:R]/{s[k:R].snd_claim[i][j]},
+														rcv_claim[i:R][j:R]/{s[k:R].rcv_claim[i][j]},
+														snd_token[NUMBER_OF_NODE-1][0]/{s[k:R].snd_token[-1][0]},  // -1 est renomé par NUMBER_OF_NODE-1 à la fin
+														rcv_token[NUMBER_OF_NODE-1][0]/{s[k:R].rcv_token[-1][0]}}. // -1 est renomé par NUMBER_OF_NODE-1 à la fin
+
+
+/**************************************************************************
+	
+	Séquence de modèle mininal ABSTRACT
+	-----------------------------------
+	
+	On force LTSA à minimiser ELECTIONRING                                 
+	jusqu'à ce le dernier modéle soit équivalent à ELECTIONRINGSERVICE	  	
+
+**************************************************************************/
+								
+minimal ||ABSTRACT0 = ELECTIONRING.
+minimal ||ABSTRACT1 = ABSTRACT0\{snd_token[0][1]}.
+minimal ||ABSTRACT2 = ABSTRACT1\{snd_token[1][2]}.
+minimal ||ABSTRACT3 = ABSTRACT2\{snd_token[2][0]}.
+minimal ||ABSTRACT4 = ABSTRACT3\{rcv_token[0][1]}.
+minimal ||ABSTRACT5 = ABSTRACT4\{rcv_token[1][2]}.
+minimal ||ABSTRACT6 = ABSTRACT5\{rcv_token[2][0]}.
+minimal ||ABSTRACT7 = ABSTRACT6\{snd_claim[0][0]}.
+minimal ||ABSTRACT8 = ABSTRACT7\{snd_claim[0][1]}.
+minimal ||ABSTRACT9 = ABSTRACT8\{snd_claim[0][2]}.
+minimal ||ABSTRACT10 = ABSTRACT9\{snd_claim[1][0]}.
+minimal ||ABSTRACT11 = ABSTRACT10\{snd_claim[1][1]}.
+minimal ||ABSTRACT12 = ABSTRACT11\{snd_claim[1][2]}.
+minimal ||ABSTRACT13 = ABSTRACT12\{snd_claim[2][0]}.
+minimal ||ABSTRACT14 = ABSTRACT13\{snd_claim[2][1]}.
+minimal ||ABSTRACT15 = ABSTRACT14\{snd_claim[2][2]}.
+minimal ||ABSTRACT16 = ABSTRACT15\{rcv_claim[0][0]}.
+minimal ||ABSTRACT17 = ABSTRACT16\{rcv_claim[0][1]}.
+minimal ||ABSTRACT18 = ABSTRACT17\{rcv_claim[0][2]}.
+minimal ||ABSTRACT19 = ABSTRACT18\{rcv_claim[1][0]}.
+minimal ||ABSTRACT20 = ABSTRACT19\{rcv_claim[1][1]}.
+minimal ||ABSTRACT21 = ABSTRACT20\{rcv_claim[1][2]}.
+minimal ||ABSTRACT22 = ABSTRACT21\{rcv_claim[2][0]}.
+minimal ||ABSTRACT23 = ABSTRACT22\{rcv_claim[2][1]}.
+minimal ||ABSTRACT24 = ABSTRACT23\{rcv_claim[2][2]}.
+
+
+
+
+

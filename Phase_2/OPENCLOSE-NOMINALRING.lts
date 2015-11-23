@@ -1,0 +1,62 @@
+/* 
+*------------------------------- 
+* OPENCLOSE_NOMINALRING
+*-------------------------------
+* Scott Ivinza Mbe & Jos Zigabe
+*-------------------------------
+*/
+
+const NUMBER_OF_NODE=2 // nombre des noeuds
+range R = 0..NUMBER_OF_NODE-1
+
+/*****************************************************************************
+	
+	Processus NODE 
+	--------------
+
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+******************************************************************************/
+
+
+NODE(N = 0)	=	if(N==0) then LEADER
+				else IDLE,
+// Mode LEADER
+LEADER	=	(open -> close -> snd_token[N][(N+1)%NUMBER_OF_NODE] -> IDLE
+			| snd_token[N][(N+1)%NUMBER_OF_NODE] -> IDLE),
+// Mode IDLE
+IDLE	=	(rcv_token[N-1][N] -> LEADER).
+
+/******************************************************************************
+	
+	Processus CHANNEL
+	-----------------
+
+	x_token[i][j] signifie que le token passe du noeud i au noeud j (où j = i+1)
+
+******************************************************************************/
+ 
+CHANNEL(N = 0)	=	(snd_token[N-1][N]-> rcv_token[N-1][N]->CHANNEL).
+
+/* 
+	Proprièté OPENCLOSE 
+	-------------------
+*/
+
+property OPENCLOSE = (s[i:R].open -> s[i].close -> OPENCLOSE).
+
+/*
+	Processus composé NOMINALRING 
+	-----------------------------
+*/
+
+||NOMINALRING =  (s[i:R]:NODE(i) || s[i:R]:CHANNEL(i))/{snd_token[i:R][j:R]/{s[k:R].snd_token[i][j]},
+														rcv_token[i:R][j:R]/{s[k:R].rcv_token[i][j]},
+														snd_token[NUMBER_OF_NODE-1][0]/{s[k:R].snd_token[-1][0]},  // -1 est renommé par NUMBER_OF_NODE-1 à la fin
+														rcv_token[NUMBER_OF_NODE-1][0]/{s[k:R].rcv_token[-1][0]}}. // -1 est renommé par NUMBER_OF_NODE-1 à la fin
+/*
+	Processus composé OPENCLOSE_NOMINALRING 
+	---------------------------------------
+*/
+
+||OPENCLOSE_NOMINALRING = (NOMINALRING || OPENCLOSE).
